@@ -1,4 +1,4 @@
-﻿# 心情手记（MoodJournal）
+# 心情手记（MoodJournal）
 
 一款**完全离线**的 HarmonyOS 个人心情日记与生活记录应用，已在华为应用市场上架。
 
@@ -12,7 +12,7 @@
 
 | 首页 | 记录日历 | 账本 | 应用锁 |
 |---|---|---|---|
-| ![首页](docs/store/screenshots/01-首页.png) | ![记录日历](docs/store/screenshots/02-记录日历.png) | ![账本](docs/store/screenshots/03-账本.png) | ![应用锁](docs/store/screenshots/05-应用锁-紧凑版.png) |
+| ![首页](docs/store/screenshots/01-首页.png) | ![记录日历](docs/store/screenshots/02-记录日历.png) | ![账本](docs/store/screenshots/03-账本.png) | ![应用锁](docs/store/screenshots/05-应用锁.png) |
 
 ---
 
