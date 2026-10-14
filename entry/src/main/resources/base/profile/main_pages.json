@@ -1,0 +1,22 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/SetupPage",
+    "pages/HomePage",
+    "pages/RecordPage",
+    "pages/LogDetailPage",
+    "pages/SearchPage",
+    "pages/TimelinePage",
+    "pages/ReviewPage",
+    "pages/HabitPage",
+    "pages/DayPlanPage",
+    "pages/LockPage",
+    "pages/LockSettingsPage",
+    "pages/TagBrowsePage",
+    "pages/AnnualReportPage",
+    "pages/AnniversaryPage",
+    "pages/AlbumPage",
+    "pages/StatsPage",
+    "pages/TaskPlanPage"
+  ]
+}

@@ -1,0 +1,36 @@
+# ── 构建产物与 IDE 缓存（DevEco 默认）──
+/node_modules
+/oh_modules
+/local.properties
+/.idea
+**/build
+/.hvigor
+.cxx
+/.clangd
+/.clang-format
+/.clang-tidy
+**/.test
+/.appanalyzer
+
+# ── 预览器 / 代码生成缓存 ──
+**/.preview
+/.codegenie
+
+# ── Python 缓存（tools 下的脚本会产生）──
+__pycache__/
+*.pyc
+
+# ── 签名材料与本机配置：绝不可提交 ──
+# build-profile.json5 含本机证书的绝对路径与 DevEco 加密口令，
+# 因此不纳入版本控制，改以 build-profile.json5.example 作为模板
+/build-profile.json5
+/build-profile.json5.autosign.bak
+/tools/signing.local.txt
+
+# ── 个人材料：不属于开源内容 ──
+/resume_task/
+/docs/个人开发者鸿蒙应用上架全流程.docx
+/tools/update_resume.py
+
+# ── 临时/导出物 ──
+/icon_preview.png

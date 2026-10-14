@@ -1,0 +1,10 @@
+{
+  "name": "entry",
+  "version": "1.0.0",
+  "description": "DateLog 应用主模块",
+  "main": "",
+  "author": "DateLog",
+  "license": "",
+  "dependencies": {}
+}
+

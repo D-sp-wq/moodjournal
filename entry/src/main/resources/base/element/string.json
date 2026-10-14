@@ -1,0 +1,32 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "心情手记：每天记下心情、今天发生的事，以及明天要做的事"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "心情手记主界面"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "心情手记"
+    },
+    {
+      "name": "EntryFormAbility_desc",
+      "value": "心情手记 服务卡片"
+    },
+    {
+      "name": "EntryFormAbility_label",
+      "value": "心情手记 卡片"
+    },
+    {
+      "name": "widget_display_name",
+      "value": "今日心情"
+    },
+    {
+      "name": "widget_description",
+      "value": "显示今天是否已记录与今日心情"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  // 这是 build-profile.json5 的模板。
+  //
+  // 为什么仓库里没有 build-profile.json5 本体：
+  // 真实文件里的 signingConfigs 含**本机证书的绝对路径**与 DevEco 生成的加密口令，
+  // 提交到公开仓库既泄露信息、对别人也毫无用处（路径只在你机器上有效）。
+  //
+  // 使用方法：复制本文件为 build-profile.json5（去掉注释），然后在 DevEco Studio 里
+  // 用「Project Structure → Signing Configs」配置你自己的签名；
+  // 或者按 tools/sign_release.ps1 的自控签名流程，出未签名包后手工签。
+  "app": {
+    // 留空：需要真机调试时由 DevEco 自行写入，或按上面的方式配置
+    "signingConfigs": [],
+    "products": [
+      {
+        "name": "default",
+        "targetSdkVersion": "26.0.0",
+        "compatibleSdkVersion": "6.1.1(24)",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug",
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}
