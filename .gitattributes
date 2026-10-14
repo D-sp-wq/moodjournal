@@ -1,0 +1,32 @@
+# 统一换行符，避免不同机器上反复出现 CRLF 警告与无意义的整文件 diff
+* text=auto eol=lf
+
+# Windows 脚本按 CRLF 检出（PowerShell 对 LF 的兼容性视版本而定）
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# 二进制文件不做任何换行转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.docx binary
+*.pdf binary
+*.zip binary
+*.app binary
+*.hap binary
+*.abc binary
+
+# 证书与密钥：理论上不该出现在仓库里，这里再声明一次，确保不被当文本处理
+*.p12 binary
+*.cer binary
+*.p7b binary
+*.csr binary
+*.keystore binary
+
+# 商店素材属于生成物，不计入语言统计
+docs/store/screenshots/* linguist-generated=true
+docs/store/app-icon-*.png linguist-generated=true

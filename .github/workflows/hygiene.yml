@@ -1,0 +1,37 @@
+name: 仓库健康检查
+
+# 说明：本仓库是 HarmonyOS 应用，编译需要 DevEco Studio 与 HarmonyOS SDK，
+# GitHub 托管 runner 上没有这套环境，因此 CI **不做编译**（编译与单元测试在本地执行：
+# hvigorw assembleHap / hvigorw test）。
+#
+# 这个工作流只做**不依赖 SDK、但真实有用**的三项检查，针对的都是本项目历史上踩过的坑：
+#   1. 签名材料 / 口令 / 本机用户名路径混进版本控制
+#   2. 测试文件写了却没注册进 List.test.ets（会"存在但从不运行"）
+#   3. versionCode 回退（应用市场会拒绝上传）
+#
+# 本地也可以用同一份脚本自检： python tools/check_repo_hygiene.py
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    name: 仓库自检
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: 运行仓库健康检查
+        run: python tools/check_repo_hygiene.py

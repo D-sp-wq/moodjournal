@@ -6,6 +6,25 @@
 
 > 应用名：心情手记 · 包名 `com.datelog.couple` · 当前版本 1.7.0（versionCode 1000010）
 
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![仓库健康检查](https://github.com/D-sp-wq/moodjournal/actions/workflows/hygiene.yml/badge.svg)](https://github.com/D-sp-wq/moodjournal/actions/workflows/hygiene.yml)
+![Platform](https://img.shields.io/badge/platform-HarmonyOS-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-276%20passed-success.svg)
+
+**目录**
+
+- [截图](#截图)
+- [功能](#功能)
+- [工程实现要点](#工程实现要点)
+- [技术栈](#技术栈)
+- [目录结构](#目录结构)
+- [构建](#构建)
+- [仓库自检](#仓库自检)
+- [更新日志](#更新日志)
+- [后续计划](#后续计划)
+- [隐私](#隐私)
+- [许可证](#许可证)
+
 ---
 
 ## 截图
@@ -122,6 +141,44 @@ hvigorw test --mode module -p product=default --no-daemon
 ```
 
 用 DevEco Studio 直接打开工程也可以（首次会提示配置签名）。
+
+---
+
+## 仓库自检
+
+仓库里带了一个不依赖 HarmonyOS SDK 的健康检查脚本，GitHub Actions 每次推送都会跑（见 [.github/workflows/hygiene.yml](.github/workflows/hygiene.yml)），本地也可以手动执行：
+
+```bash
+python tools/check_repo_hygiene.py
+```
+
+它检查三类**本项目真实踩过的坑**：
+
+| 检查 | 为什么需要 |
+|---|---|
+| 签名材料 / 口令 / 本机用户名路径是否混进版本控制 | 签名口令曾以明文写在脚本里；工具脚本里曾有本机绝对路径 |
+| 测试文件是否都注册进了 `List.test.ets` | 该文件是唯一测试入口，漏注册的用例会"存在但从不运行"，测试看着全绿实际有覆盖空洞 |
+| `versionCode` 是否大于已上架版本 | 应用市场要求每次上架的版本号严格递增，否则直接拒绝 |
+
+> CI **不做编译**：HarmonyOS 编译需要 DevEco Studio 与 SDK，托管 runner 上没有这套环境。
+> 编译与单元测试在本地执行（`hvigorw assembleHap` / `hvigorw test`）。
+
+---
+
+## 更新日志
+
+各版本的新增、优化与工程变更记录在 [CHANGELOG.md](CHANGELOG.md)。
+
+---
+
+## 后续计划
+
+这些是已知可以改进、但尚未排期的方向：
+
+- **补全页面底部安全区**：内容较短的页面在整屏 `Scroll` 中会被垂直居中，顶部留白偏大（应用锁设置页最明显）
+- **`LogDetailPage` 支持编辑标签**：目前详情页只读展示，增删标签需回到记录页
+- **界面自动化测试**：现有 276 条都是纯函数与逻辑层测试，UI 交互仍靠真机人工验证
+- **平板 / 折叠屏适配**：目前只针对手机布局
 
 ---
 
