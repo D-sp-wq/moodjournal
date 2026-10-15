@@ -22,6 +22,12 @@ struct TimelinePage {
     this.load();
   }
 
+  onPageShow(): void {
+    // 从详情页/编辑页返回后心情、照片、标签都可能已经变了，所以重新读一次。
+    // （aboutToAppear 只在首次创建时执行，router.back() 回来不会重跑）
+    this.load();
+  }
+
   private async load(): Promise<void> {
     try {
       const repo = RepositoryFactory.getRepository();

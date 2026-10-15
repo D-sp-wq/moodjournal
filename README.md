@@ -4,7 +4,7 @@
 
 不需要注册、不需要联网、没有广告。所有数据只保存在本机。
 
-> 应用名：心情手记 · 包名 `com.datelog.couple` · 当前版本 1.7.0（versionCode 1000010）
+> 应用名：心情手记 · 包名 `com.datelog.couple` · 当前版本 1.7.1（versionCode 1000011）
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![仓库健康检查](https://github.com/D-sp-wq/moodjournal/actions/workflows/hygiene.yml/badge.svg)](https://github.com/D-sp-wq/moodjournal/actions/workflows/hygiene.yml)

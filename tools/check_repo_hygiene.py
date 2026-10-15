@@ -170,6 +170,35 @@ else:
         else:
             print('  ✓ 大于已上架版本 1000009')
 
+# ── 4. 返回页面时是否会刷新 ───────────────────────────────────
+# 教训来源：应用市场审核反馈「我的-时间轴-编辑：改变心情无法实时更新」。
+# 根因是页面只有 aboutToAppear（仅首次创建时执行），router.back() 返回不会重跑，
+# 于是页面一直显示旧数据。凡是会跳转到别的页面、又可能被"改完再回来"的页面，
+# 都必须在 onPageShow 里重新读数据。
+section('4. 会跳转的页面是否在 onPageShow 里刷新')
+PAGES_DIR = os.path.join(ROOT, 'entry', 'src', 'main', 'ets', 'pages')
+if not os.path.isdir(PAGES_DIR):
+    print('  跳过（找不到 pages 目录）')
+else:
+    stale_pages = []
+    navigable = 0
+    for name in sorted(os.listdir(PAGES_DIR)):
+        if not name.endswith('.ets'):
+            continue
+        with open(os.path.join(PAGES_DIR, name), 'r', encoding='utf-8', errors='ignore') as fh:
+            body = fh.read()
+        if 'pushUrl' not in body and 'pushPath' not in body:
+            continue          # 自包含页面，没有"去别的页再回来"的路径
+        navigable += 1
+        if 'onPageShow' not in body:
+            stale_pages.append(name)
+
+    print('  会跳转的页面 %d 个，其中缺少 onPageShow 的 %d 个' % (navigable, len(stale_pages)))
+    if stale_pages:
+        problems.append('这些页面跳转后返回不会刷新，会显示旧数据: %s' % ', '.join(stale_pages))
+    else:
+        print('  ✓ 全部会在返回时刷新')
+
 # ── 结论 ─────────────────────────────────────────────────────
 section('结论')
 if problems:
