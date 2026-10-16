@@ -23,6 +23,7 @@ import importTest from './Import.test';
 import appLockTest from './AppLock.test';
 import tagTest from './Tag.test';
 import annualReportTest from './AnnualReport.test';
+import exportBackupTest from './Export.test';
 
 export default function testsuite() {
   localUnitTest();
@@ -50,4 +51,5 @@ export default function testsuite() {
   appLockTest();
   tagTest();
   annualReportTest();
+  exportBackupTest();
 }

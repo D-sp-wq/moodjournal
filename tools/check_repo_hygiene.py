@@ -199,6 +199,76 @@ else:
     else:
         print('  ✓ 全部会在返回时刷新')
 
+# ── 5. service 层是否有"写了但没接线"的函数 ───────────────────
+# 教训来源：应用市场审核反馈「导出的是 TXT，而恢复需要 JSON，导致无法恢复」。
+# 根因是 buildExportJson 实现完整、单元测试也覆盖，却**没有任何调用点** ——
+# 功能在代码里存在，用户却根本用不到。
+# 规则：services 下的 export function，若在「定义文件之外、且测试目录之外」无任何引用，即为未接线。
+# 只被测试引用不算接线：单测全绿不等于用户能用上。
+section('5. service 层导出函数是否都接了线')
+SERVICES_DIR = os.path.join(ROOT, 'entry', 'src', 'main', 'ets', 'services')
+TEST_PREFIX = 'entry/src/test/'
+
+# 一次读入全部源码，避免逐个函数重复读文件
+source_corpus = []          # [(绝对路径, 相对路径, 内容)]
+for base, dirs, names in os.walk(os.path.join(ROOT, 'entry', 'src')):
+    dirs[:] = [d for d in dirs if d not in ('build', 'oh_modules')]
+    for n in names:
+        if not n.endswith('.ets'):
+            continue
+        p = os.path.join(base, n)
+        rel = os.path.relpath(p, ROOT).replace('\\', '/')
+        with open(p, 'r', encoding='utf-8', errors='ignore') as fh:
+            source_corpus.append((os.path.abspath(p), rel, fh.read()))
+
+if not os.path.isdir(SERVICES_DIR):
+    print('  跳过（找不到 services 目录）')
+else:
+    unused_fns = []
+    total_fn = 0
+    for own_abs, own_rel, own_body in source_corpus:
+        if not own_abs.startswith(os.path.abspath(SERVICES_DIR)):
+            continue
+        for m in re.finditer(r'^export\s+(?:async\s+)?function\s+(\w+)', own_body, re.M):
+            fn = m.group(1)
+            total_fn += 1
+            wired = False
+            for other_abs, other_rel, other_body in source_corpus:
+                if other_abs == own_abs or other_rel.startswith(TEST_PREFIX):
+                    continue
+                if re.search(r'\b%s\b' % re.escape(fn), other_body):
+                    wired = True
+                    break
+            if not wired:
+                unused_fns.append('%s (%s)' % (fn, os.path.basename(own_rel)))
+
+    print('  service 导出函数 %d 个，未接线 %d 个' % (total_fn, len(unused_fns)))
+    if unused_fns:
+        problems.append('这些函数写了却没有调用点，用户用不到: %s' % ', '.join(unused_fns))
+    else:
+        print('  ✓ 全部已接线')
+
+# ── 6. 代码里用到的路由是否都已注册 ───────────────────────────
+# pushUrl 里手写的 'pages/Xxx' 一旦写错，跳转是**静默失败**（不报错、页面不动），
+# 真机上极难排查。这里拿 main_pages.json 做一次全量比对。
+section('6. 代码里用到的路由是否都在 main_pages.json 中注册')
+MAIN_PAGES = os.path.join(ROOT, 'entry', 'src', 'main', 'resources', 'base', 'profile', 'main_pages.json')
+if not os.path.isfile(MAIN_PAGES):
+    print('  跳过（找不到 main_pages.json）')
+else:
+    with open(MAIN_PAGES, 'r', encoding='utf-8', errors='ignore') as fh:
+        registered = set(re.findall(r'"(pages/[A-Za-z0-9_]+)"', fh.read()))
+    used = set()
+    for _abs, rel, body in source_corpus:
+        if rel.startswith('entry/src/main/ets/'):
+            used.update(re.findall(r"['\"](pages/[A-Za-z0-9_]+)['\"]", body))
+    missing_routes = sorted(used - registered)
+    print('  代码里用到 %d 个路由，main_pages.json 注册 %d 个' % (len(used), len(registered)))
+    if missing_routes:
+        problems.append('这些路由被引用但未注册，跳转会静默失败: %s' % ', '.join(missing_routes))
+    else:
+        print('  ✓ 全部已注册')
+
 # ── 结论 ─────────────────────────────────────────────────────
 section('结论')
 if problems:

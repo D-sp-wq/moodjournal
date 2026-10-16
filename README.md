@@ -4,12 +4,12 @@
 
 不需要注册、不需要联网、没有广告。所有数据只保存在本机。
 
-> 应用名：心情手记 · 包名 `com.datelog.couple` · 当前版本 1.7.1（versionCode 1000011）
+> 应用名：心情手记 · 包名 `com.datelog.couple` · 当前版本 1.7.2（versionCode 1000012）
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![仓库健康检查](https://github.com/D-sp-wq/moodjournal/actions/workflows/hygiene.yml/badge.svg)](https://github.com/D-sp-wq/moodjournal/actions/workflows/hygiene.yml)
 ![Platform](https://img.shields.io/badge/platform-HarmonyOS-brightgreen.svg)
-![Tests](https://img.shields.io/badge/tests-276%20passed-success.svg)
+![Tests](https://img.shields.io/badge/tests-288%20passed-success.svg)
 
 **目录**
 
@@ -77,7 +77,7 @@
 
 **1. 业务计算全部抽成可测试的纯函数**
 统计、心情趋势、周报、月度回顾、日历标记、账本洞察、消费分析、年度报告等全部放在 `entry/src/main/ets/models/` 下，
-不依赖存储与 UI，因此可以直接单元测试。**单元测试 276 条全绿**。
+不依赖存储与 UI，因此可以直接单元测试。**单元测试 288 条全绿**。
 
 **2. 数据库版本迁移**
 `DatabaseHelper` 自建 `DB_VERSION` + `ALTER TABLE` 迁移机制，从 v3 迭代到 v6（新增自定义心情、照片、记录标记、账本感受、标签等列）。
@@ -117,7 +117,7 @@ entry/src/main/ets/
 │   └── storage/     # 数据库、偏好、应用锁、主题
 └── entryability/    # 应用入口、导航条避让、锁屏门禁
 
-entry/src/test/      # 276 条单元测试
+entry/src/test/      # 288 条单元测试
 tools/               # 签名流水线、自检、商店素材生成
 docs/                # 上架文档、隐私政策、商店素材
 ```
@@ -177,7 +177,7 @@ python tools/check_repo_hygiene.py
 
 - **补全页面底部安全区**：内容较短的页面在整屏 `Scroll` 中会被垂直居中，顶部留白偏大（应用锁设置页最明显）
 - **`LogDetailPage` 支持编辑标签**：目前详情页只读展示，增删标签需回到记录页
-- **界面自动化测试**：现有 276 条都是纯函数与逻辑层测试，UI 交互仍靠真机人工验证
+- **界面自动化测试**：现有 288 条都是纯函数与逻辑层测试，UI 交互仍靠真机人工验证
 - **平板 / 折叠屏适配**：目前只针对手机布局
 
 ---

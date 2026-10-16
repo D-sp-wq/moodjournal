@@ -365,6 +365,11 @@ export function parseImportJson(text: string): ImportResult {
   try {
     parsed = JSON.parse(text) as Object;
   } catch (err) {
+    // 用户很容易先导出「可读文本」再去点「从备份恢复」。
+    // 这时只提示"不是有效的 JSON"，他并不知道下一步该做什么 —— 认出 TXT 导出并给出明确指引。
+    if (looksLikeTextExport(text)) {
+      return failure('这是「可读文本」导出的文件，不能用于恢复。请点「导出我的数据」→ 选「备份文件（JSON）」重新导出后再恢复');
+    }
     return failure('文件内容不是有效的 JSON，可能不是备份文件');
   }
   if (parsed === null || typeof parsed !== 'object') {
@@ -484,4 +489,23 @@ export function describeCounts(result: ImportResult): string {
     }
   }
   return parts.length === 0 ? '没有任何数据' : parts.join('、');
+}
+
+/**
+ * 判断一段文本是不是「可读文本（TXT）」导出的内容。
+ *
+ * 为什么要单独判断：用户很容易先点「导出我的数据」拿到 TXT，再去点「从备份恢复」，
+ * 这时只提示"不是有效的 JSON"，他并不知道下一步该做什么。
+ * 认出 TXT 导出后就能明确告诉他去哪里生成正确的备份文件。
+ *
+ * 判据取 buildExportText 输出的两个特征（标题行 + 第一个分区标题），
+ * 两者**同时**出现才判定，避免把普通文本误判成导出文件。
+ */
+export function looksLikeTextExport(text: string): boolean {
+  if (typeof text !== 'string' || text === '') {
+    return false;
+  }
+  const hasTitle: boolean = text.indexOf('心情手记 · 数据导出') >= 0;
+  const hasSection: boolean = text.indexOf('===== 每日记录') >= 0;
+  return hasTitle && hasSection;
 }

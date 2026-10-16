@@ -14,6 +14,8 @@ import { Icon, IconKind } from '../components/Icons';
 @Component
 struct Index {
   @State private showPrivacy: boolean = false;
+  /** 初始化失败：显示可重试的错误页，而不是把用户丢在一个不存在的页面上 */
+  @State private initFailed: boolean = false;
 
   aboutToAppear(): void {
     this.bootstrap();
@@ -40,8 +42,11 @@ struct Index {
       }
       await this.routeByBindingState();
     } catch (err) {
+      // 这里原本跳的是 pages/BindPage —— 那是「情侣绑定」时期的页面，页面早已删除、
+      // 也没在 main_pages.json 注册，跳转会**静默失败**：用户永远停在启动页，
+      // 连"为什么打不开"都看不到。改为就地显示带「重试」的错误页。
       hilog.error(Constants.LOG_DOMAIN, Constants.LOG_TAG, '初始化失败: %{public}s', JSON.stringify(err));
-      this.getUIContext().getRouter().replaceUrl({ url: 'pages/BindPage' });
+      this.initFailed = true;
     }
   }
 
@@ -71,7 +76,7 @@ struct Index {
       hilog.warn(Constants.LOG_DOMAIN, Constants.LOG_TAG, '退出应用失败: %{public}s', JSON.stringify(err));
     }
     this.getUIContext().getPromptAction().showToast({
-      message: '需要同意隐私政策后才能使用 DateLog',
+      message: '需要同意隐私政策后才能使用心情手记',
       duration: 2500
     });
   }
@@ -80,7 +85,7 @@ struct Index {
   private buildSplash() {
     Column() {
       Icon({ kind: IconKind.NOTE, iconSize: 72, color: Constants.COLOR_PRIMARY })
-      Text('DateLog')
+      Text('心情手记')
         .fontSize(28)
         .fontWeight(FontWeight.Bold)
         .fontColor(Constants.COLOR_PRIMARY)
@@ -171,12 +176,48 @@ struct Index {
     .alignItems(HorizontalAlign.Start)
   }
 
+  @Builder
+  private buildInitErrorView() {
+    Column() {
+      Icon({ kind: IconKind.CLOSE, iconSize: 56, color: Constants.COLOR_TEXT_TERTIARY })
+      Text('初始化失败')
+        .fontSize(20)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(Constants.COLOR_TEXT_PRIMARY)
+        .margin({ top: 12 })
+      Text('可能是存储空间不足，或本机数据文件损坏。可以先点「重试」；'
+        + '如果一直失败，建议卸载后重新安装应用。')
+        .fontSize(14)
+        .lineHeight(22)
+        .fontColor(Constants.COLOR_TEXT_SECONDARY)
+        .margin({ top: 8 })
+      Button('重试')
+        .width('100%')
+        .height(44)
+        .fontSize(17)
+        .backgroundColor(Constants.COLOR_PRIMARY)
+        .fontColor(Constants.COLOR_ON_BRAND)
+        .margin({ top: 20 })
+        .onClick(() => {
+          this.initFailed = false;
+          this.bootstrap();
+        })
+    }
+    .width('100%')
+    .height('100%')
+    .padding({ left: 24, right: 24 })
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Start)
+    .backgroundColor(Constants.COLOR_BACKGROUND)
+  }
+
   build() {
-    if (this.showPrivacy) {
+    if (this.initFailed) {
+      this.buildInitErrorView()
+    } else if (this.showPrivacy) {
       this.buildPrivacyView()
     } else {
       this.buildSplash()
     }
   }
 }
-0

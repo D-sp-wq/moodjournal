@@ -27,7 +27,7 @@ import { EmptyState } from '../components/EmptyState';
 import { MoodDot } from '../components/MoodDot';
 import { Icon, IconKind } from '../components/Icons';
 import { LedgerView } from '../components/LedgerView';
-import { buildExportText, saveExport } from '../services/ExportService';
+import { buildExportJson, buildExportText, saveExport } from '../services/ExportService';
 import {
   ExistingCounts,
   RestoreOutcome,
@@ -303,11 +303,40 @@ struct HomePage {
   }
 
   /**
-   * 导出全部数据。
+   * 导出全部数据 · 第一步：让用户明确选格式。
+   *
+   * 必须显式区分两种格式，原因很实际：TXT 是给人看的，**不能用来恢复**；
+   * 只有 JSON 才是「从备份恢复」认的备份文件。
+   * 早先版本这里只导出 TXT 且没有 JSON 入口，用户拿到文件后无法恢复，
+   * 应用市场审核也反馈过这个问题 —— 所以现在把选择摆到用户面前。
+   */
+  private exportAll(): void {
+    this.getUIContext().showAlertDialog({
+      title: '导出我的数据',
+      message: '可读文本：方便自己查看、打印，不能用于恢复。\n'
+        + '备份文件：换手机或重装后，可以用它把数据恢复回来。',
+      primaryButton: {
+        value: '可读文本（TXT）',
+        action: () => {
+          this.doExport(false);
+        }
+      },
+      secondaryButton: {
+        value: '备份文件（JSON）',
+        fontColor: Constants.COLOR_PRIMARY,
+        action: () => {
+          this.doExport(true);
+        }
+      }
+    });
+  }
+
+  /**
+   * 导出全部数据 · 第二步：按选定格式写文件。
    * 数据本来就在本机，这一步是"数据自主掌控"的最后一环：换机、留档、自己看。
    * 走系统文件选择器，零权限、不联网。
    */
-  private async exportAll(): Promise<void> {
+  private async doExport(asJson: boolean): Promise<void> {
     try {
       const repo = RepositoryFactory.getRepository();
       const logs: DailyLog[] = await repo.getDailyLogs();
@@ -317,17 +346,27 @@ struct HomePage {
       const plans: TaskPlan[] = await repo.getTaskPlans();
       const days: Anniversary[] = await repo.getImportantDays();
 
-      const text: string = buildExportText(logs, ledger, habits, checks, plans, days);
       const context = this.getUIContext().getHostContext();
       if (context === undefined) {
         this.getUIContext().getPromptAction().showToast({ message: '导出失败，请重试', duration: 2000 });
         return;
       }
-      const saved: boolean = await saveExport(context, `心情手记-${this.today}.txt`, text);
+
+      let saved: boolean = false;
+      if (asJson) {
+        // 文件名带上「备份」，和给人看的 TXT 一眼区分开
+        const backup: string = buildExportJson(logs, ledger, habits, checks, plans, days);
+        saved = await saveExport(context, `心情手记-备份-${this.today}.json`, backup);
+      } else {
+        const text: string = buildExportText(logs, ledger, habits, checks, plans, days);
+        saved = await saveExport(context, `心情手记-${this.today}.txt`, text);
+      }
       if (saved) {
         this.getUIContext().getPromptAction().showToast({
-          message: '已导出，可在「文件」里找到',
-          duration: 2000
+          message: asJson
+            ? '已导出备份文件，可在「从备份恢复」中用它还原'
+            : '已导出文本文件，可在「文件」里查看',
+          duration: 2500
         });
       }
     } catch (err) {
@@ -385,7 +424,9 @@ struct HomePage {
     this.getUIContext().showAlertDialog({
       title: '从备份恢复',
       message: `备份里有：${summary}。\n\n恢复会覆盖当前的 ${shown}，且无法撤销。`
-        + `建议先导出一次当前数据留档。`,
+        + `建议先导出一次当前数据留档。\n\n`
+        + `注意：昵称、头像、月度预算、应用锁等本机设置，以及照片文件本身，`
+        + `不包含在备份中，恢复后不会被改动。`,
       primaryButton: {
         value: '取消',
         action: () => {
@@ -1510,7 +1551,7 @@ struct HomePage {
             .fontColor(Constants.COLOR_TEXT_PRIMARY)
             .margin({ left: 10 })
           Blank()
-          Text('TXT')
+          Text('TXT / JSON')
             .fontSize(14)
             .fontColor(Constants.COLOR_TEXT_TERTIARY)
         }
