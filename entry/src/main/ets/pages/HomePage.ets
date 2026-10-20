@@ -17,9 +17,11 @@ import {
 import { Anniversary, getAnniversaryTypeLabel } from '../models/Anniversary';
 import { DEFAULT_AVATAR_ID, AvatarOption, AVATAR_OPTIONS, findAvatar } from '../models/Avatar';
 import { TaskPlan, TaskProgress, computeTaskProgress } from '../models/TaskPlan';
+import { PlanReminderSettings, planReminderStatusLabel } from '../models/PlanReminder';
 import { SessionManager } from '../services/storage/SessionManager';
 import { ThemeManager } from '../services/storage/ThemeManager';
 import { AppLockManager } from '../services/storage/AppLockManager';
+import { PlanReminderService } from '../services/PlanReminderService';
 import { RepositoryFactory } from '../services/data/RepositoryFactory';
 import { PhotoService } from '../services/PhotoService';
 import { CalendarHeatmap } from '../components/CalendarHeatmap';
@@ -106,6 +108,10 @@ struct HomePage {
   /** 应用锁是否已开启（「我的」入口展示状态） */
   @State private lockOn: boolean = false;
 
+  /** 「今日提醒」入口右侧的状态：'09:00' 或 '已关闭'；planReminderOn 只用来决定这行字用主色还是灰色 */
+  @State private planReminderLabel: string = '已关闭';
+  @State private planReminderOn: boolean = false;
+
   aboutToAppear(): void {
     this.loadData();
   }
@@ -143,6 +149,12 @@ struct HomePage {
       this.avatarId = basics[2];
       this.avatarUri = basics[3];
       this.today = DateUtils.today();
+
+      // 「今日提醒」入口的状态：每次回到首页都重新读一次，设置页改完返回就能看到
+      const planReminder: PlanReminderSettings = await PlanReminderService.readSettings();
+      this.planReminderOn = planReminder.enabled;
+      this.planReminderLabel =
+        planReminderStatusLabel(planReminder.enabled, planReminder.hour, planReminder.minute);
 
       const hostContext = this.getUIContext().getHostContext();
       if (hostContext !== undefined) {
@@ -287,6 +299,10 @@ struct HomePage {
 
   private goLockSettings(): void {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/LockSettingsPage' });
+  }
+
+  private goReminderSettings(): void {
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/ReminderSettingsPage' });
   }
 
   private goTagBrowse(): void {
@@ -1542,6 +1558,35 @@ struct HomePage {
         .margin({ top: 12 })
         .onClick(() => {
           this.goStats();
+        })
+
+        // 今日提醒：到点推送一条通知，内容是今天要做的事（状态直接显示在右侧）
+        Row() {
+          Icon({ kind: IconKind.CALENDAR, iconSize: 24, color: Constants.COLOR_PRIMARY })
+          Text('今日提醒')
+            .fontSize(17)
+            .fontColor(Constants.COLOR_TEXT_PRIMARY)
+            .margin({ left: 10 })
+          Blank()
+          Text(this.planReminderLabel)
+            .fontSize(15)
+            .fontColor(this.planReminderOn ? Constants.COLOR_PRIMARY : Constants.COLOR_TEXT_TERTIARY)
+            .margin({ right: 6 })
+          Icon({ kind: IconKind.CHEVRON, iconSize: 20, color: Constants.COLOR_TEXT_TERTIARY })
+        }
+        .width('100%')
+        .padding(16)
+        .borderRadius(16)
+        .backgroundColor(Constants.COLOR_CARD)
+        .border({ width: 1, color: Constants.COLOR_BORDER_SUBTLE })
+        .margin({ top: 12 })
+        .stateStyles({
+          pressed: {
+            .opacity(0.75)
+          }
+        })
+        .onClick(() => {
+          this.goReminderSettings();
         })
 
         Row() {

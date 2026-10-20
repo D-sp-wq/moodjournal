@@ -5,6 +5,7 @@ import { PrivacySection, PrivacyText } from '../common/constants/PrivacyText';
 import { DatabaseHelper } from '../services/storage/DatabaseHelper';
 import { SessionManager } from '../services/storage/SessionManager';
 import { AppLockManager } from '../services/storage/AppLockManager';
+import { PlanReminderService } from '../services/PlanReminderService';
 import { Icon, IconKind } from '../components/Icons';
 
 /**
@@ -39,6 +40,13 @@ struct Index {
         // 首启：先展示隐私政策，同意后再分流
         this.showPrivacy = true;
         return;
+      }
+      // 同意之后才碰「今日提醒」：重排一次已排期的提醒（冷启动是主要的重排时机）。
+      // 单独包一层 try/catch：提醒坏了只记日志，不能把用户丢进"初始化失败"页。
+      try {
+        await PlanReminderService.sync();
+      } catch (err) {
+        hilog.warn(Constants.LOG_DOMAIN, Constants.LOG_TAG, '同步今日提醒失败: %{public}s', JSON.stringify(err));
       }
       await this.routeByBindingState();
     } catch (err) {

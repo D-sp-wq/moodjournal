@@ -164,11 +164,14 @@ else:
     else:
         print('  versionName = %s' % name.group(1))
         print('  versionCode = %s' % code.group(1))
-        if int(code.group(1)) <= 1000009:
-            problems.append('versionCode %s 未大于已上架版本 1000009，应用市场会拒绝'
-                            % code.group(1))
+        # ⚠️ 每有一个版本上架，就把这里的基准号改成那个版本的 versionCode。
+        #    应用市场要求新版本严格大于**线上最新**版本，用旧基准会放过非法版本号。
+        published_code = 1000011      # 1.7.1，已上架
+        if int(code.group(1)) <= published_code:
+            problems.append('versionCode %s 未大于已上架版本 %s，应用市场会拒绝'
+                            % (code.group(1), published_code))
         else:
-            print('  ✓ 大于已上架版本 1000009')
+            print('  ✓ 大于已上架版本 %s' % published_code)
 
 # ── 4. 返回页面时是否会刷新 ───────────────────────────────────
 # 教训来源：应用市场审核反馈「我的-时间轴-编辑：改变心情无法实时更新」。

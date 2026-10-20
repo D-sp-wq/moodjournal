@@ -12,6 +12,7 @@
     "pages/DayPlanPage",
     "pages/LockPage",
     "pages/LockSettingsPage",
+    "pages/ReminderSettingsPage",
     "pages/TagBrowsePage",
     "pages/AnnualReportPage",
     "pages/AnniversaryPage",

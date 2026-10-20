@@ -5,6 +5,7 @@ import { IdUtils } from '../common/utils/IdUtils';
 import { readDateParam } from '../common/utils/RouteUtils';
 import { DailyLog, Mood } from '../models/DailyLog';
 import { RepositoryFactory } from '../services/data/RepositoryFactory';
+import { PlanReminderService } from '../services/PlanReminderService';
 import { Icon, IconKind } from '../components/Icons';
 
 /**
@@ -100,6 +101,9 @@ struct DayPlanPage {
           updatedAt: Date.now()
         });
       }
+      // 那天要做的事变了 → 重排「今日提醒」。
+      // 不 await：排期要过系统提醒服务，别拖慢保存后的返回；sync 内部已吞掉所有异常。
+      PlanReminderService.sync();
       this.getUIContext().getPromptAction().showToast({ message: '已记下那天要做的事', duration: 1500 });
       this.getUIContext().getRouter().back();
     } catch (err) {

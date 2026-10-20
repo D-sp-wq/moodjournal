@@ -47,4 +47,15 @@ export class Constants {
   // 单条记录正文长度上限（避免异常输入撑爆数据库）
   static readonly MAX_JOURNAL_LENGTH: number = 2000;
   static readonly MAX_PLAN_LENGTH: number = 500;
+
+  // 「今日提醒」：到点推送一条通知，内容是今天要做的事
+  /** 默认提醒时间 09:00（用户改过之后以 preferences 里的为准） */
+  static readonly PLAN_REMINDER_HOUR: number = 9;
+  static readonly PLAN_REMINDER_MINUTE: number = 0;
+  /** 通知 id 起始值：3000 + 序号（1001 / 2001 已被另外两条提醒占用） */
+  static readonly PLAN_REMINDER_ID_BASE: number = 3000;
+  /** 往后排几天（今天起，含今天） */
+  static readonly PLAN_REMINDER_DAYS: number = 7;
+  /** 通知正文最多几个字，超出截断并加省略号 */
+  static readonly PLAN_REMINDER_CONTENT_MAX: number = 40;
 }

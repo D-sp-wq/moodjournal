@@ -1,6 +1,7 @@
 import dataPreferences from '@ohos.data.preferences';
 import { common } from '@kit.AbilityKit';
 import { Constants } from '../../common/constants/Constants';
+import { parseReminderIds, serializeReminderIds } from '../../models/PlanReminder';
 
 /**
  * 会话信息单例：用 preferences 持久化昵称、头像、开始记录日期等本机信息。
@@ -26,6 +27,11 @@ export class SessionManager {
   private static readonly KEY_LOCK_HASH: string = 'lockHash';
   private static readonly KEY_LOCK_SALT: string = 'lockSalt';
   private static readonly KEY_LOCK_GRACE_MIN: string = 'lockGraceMin';
+  /** 今日提醒：开关 / 时 / 分 / 已排期的 reminderId 列表（JSON 字符串） */
+  private static readonly KEY_PLAN_REMINDER_ENABLED: string = 'planReminderEnabled';
+  private static readonly KEY_PLAN_REMINDER_HOUR: string = 'planReminderHour';
+  private static readonly KEY_PLAN_REMINDER_MINUTE: string = 'planReminderMinute';
+  private static readonly KEY_PLAN_REMINDER_IDS: string = 'planReminderIds';
 
   private constructor() {
   }
@@ -187,6 +193,50 @@ export class SessionManager {
 
   async setLockGraceMinutes(minutes: number): Promise<void> {
     await this.pref!.put(SessionManager.KEY_LOCK_GRACE_MIN, minutes);
+    await this.pref!.flush();
+  }
+
+  // ---------------- 今日提醒 ----------------
+
+  /** 是否开启「今日提醒」；默认关闭（用户没主动开就不打扰） */
+  async isPlanReminderEnabled(): Promise<boolean> {
+    return await this.pref!.get(SessionManager.KEY_PLAN_REMINDER_ENABLED, false) as boolean;
+  }
+
+  async setPlanReminderEnabled(enabled: boolean): Promise<void> {
+    await this.pref!.put(SessionManager.KEY_PLAN_REMINDER_ENABLED, enabled);
+    await this.pref!.flush();
+  }
+
+  /** 提醒的小时（默认 09:00），合法性由 models/PlanReminder.isValidTime 判定 */
+  async getPlanReminderHour(): Promise<number> {
+    return await this.pref!.get(SessionManager.KEY_PLAN_REMINDER_HOUR, Constants.PLAN_REMINDER_HOUR) as number;
+  }
+
+  async setPlanReminderHour(hour: number): Promise<void> {
+    await this.pref!.put(SessionManager.KEY_PLAN_REMINDER_HOUR, hour);
+    await this.pref!.flush();
+  }
+
+  /** 提醒的分钟（默认 00） */
+  async getPlanReminderMinute(): Promise<number> {
+    return await this.pref!.get(SessionManager.KEY_PLAN_REMINDER_MINUTE, Constants.PLAN_REMINDER_MINUTE) as number;
+  }
+
+  async setPlanReminderMinute(minute: number): Promise<void> {
+    await this.pref!.put(SessionManager.KEY_PLAN_REMINDER_MINUTE, minute);
+    await this.pref!.flush();
+  }
+
+  /** 已排期的今日提醒 id 列表；读坏了按空列表处理（最多取消不掉，不会崩） */
+  async getPlanReminderIds(): Promise<number[]> {
+    const raw: string = await this.pref!.get(SessionManager.KEY_PLAN_REMINDER_IDS, '') as string;
+    return parseReminderIds(raw);
+  }
+
+  /** 保存已排期的今日提醒 id 列表；空列表存空串 */
+  async setPlanReminderIds(ids: number[]): Promise<void> {
+    await this.pref!.put(SessionManager.KEY_PLAN_REMINDER_IDS, serializeReminderIds(ids));
     await this.pref!.flush();
   }
 }

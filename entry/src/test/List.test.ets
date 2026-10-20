@@ -24,6 +24,7 @@ import appLockTest from './AppLock.test';
 import tagTest from './Tag.test';
 import annualReportTest from './AnnualReport.test';
 import exportBackupTest from './Export.test';
+import planReminderTest from './PlanReminder.test';
 
 export default function testsuite() {
   localUnitTest();
@@ -52,4 +53,5 @@ export default function testsuite() {
   tagTest();
   annualReportTest();
   exportBackupTest();
+  planReminderTest();
 }

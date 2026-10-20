@@ -16,6 +16,7 @@ import { MAX_LOG_TAGS, MAX_TAG_LENGTH, normalizeTagInput } from '../models/Tag';
 import { SessionManager } from '../services/storage/SessionManager';
 import { RepositoryFactory } from '../services/data/RepositoryFactory';
 import { ReminderService } from '../services/ReminderService';
+import { PlanReminderService } from '../services/PlanReminderService';
 import { PhotoService } from '../services/PhotoService';
 import { MoodPicker } from '../components/MoodPicker';
 import { Icon, IconKind } from '../components/Icons';
@@ -157,6 +158,10 @@ struct RecordPage {
         await session.setTodayCustomMood(normalizeCustomMood(this.customMood));
         await ReminderService.publishDailyRecordReminder();
       }
+
+      // 昨天给今天留的计划可能变了 → 重排「今日提醒」。
+      // 不 await：排期要过系统提醒服务，别拖慢保存后的返回；sync 内部已吞掉所有异常。
+      PlanReminderService.sync();
 
       let message: string = today ? '已记下今天' : `已保存 ${this.shortDate()} 的记录`;
       if (this.isEdit) {
