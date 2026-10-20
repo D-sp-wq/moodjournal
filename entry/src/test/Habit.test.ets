@@ -79,9 +79,9 @@ export default function habitTest() {
 
     it('group_checks_by_habit', 0, () => {
       const map: Map<string, string[]> = groupChecksByHabit([
-        { id: 'c1', habitId: 'h1', date: '2026-10-10', createdAt: 0 },
-        { id: 'c2', habitId: 'h1', date: '2026-10-09', createdAt: 0 },
-        { id: 'c3', habitId: 'h2', date: '2026-10-10', createdAt: 0 }
+        { id: 'c1', habitId: 'h1', date: '2026-10-10', createdAt: 0, slotIndex: 0 },
+        { id: 'c2', habitId: 'h1', date: '2026-10-09', createdAt: 0, slotIndex: 0 },
+        { id: 'c3', habitId: 'h2', date: '2026-10-10', createdAt: 0, slotIndex: 0 }
       ]);
       const h1: string[] | undefined = map.get('h1');
       const h2: string[] | undefined = map.get('h2');

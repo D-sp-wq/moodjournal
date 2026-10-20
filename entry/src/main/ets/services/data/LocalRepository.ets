@@ -5,7 +5,7 @@ import { Anniversary } from '../../models/Anniversary';
 import { Photo } from '../../models/Photo';
 import { TaskPlan } from '../../models/TaskPlan';
 import { LedgerRecord, LedgerType, LedgerFeeling } from '../../models/Ledger';
-import { Habit, HabitCheck } from '../../models/Habit';
+import { Habit, HabitCheck, normalizeTimesPerDay, parseSlotTimes, serializeSlotTimes } from '../../models/Habit';
 import { Repository } from './Repository';
 
 /**
@@ -231,7 +231,10 @@ export class LocalRepository implements Repository {
     if (existing !== null) {
       const values: relationalStore.ValuesBucket = {
         'name': habit.name,
-        'sort_order': habit.sortOrder
+        'sort_order': habit.sortOrder,
+        'times_per_day': normalizeTimesPerDay(habit.timesPerDay),
+        'slot_times': serializeSlotTimes(habit.slotTimes),
+        'reminder_enabled': habit.reminderEnabled ? 1 : 0
       };
       const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('habits');
       predicates.equalTo('id', habit.id);
@@ -264,6 +267,8 @@ export class LocalRepository implements Repository {
     const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('habit_checks');
     predicates.equalTo('habit_id', check.habitId);
     predicates.equalTo('date', check.date);
+    // 一天多次：同一习惯 + 同一天 + 同一时段 才算同一条
+    predicates.equalTo('slot_index', check.slotIndex);
     const values: relationalStore.ValuesBucket = {
       'id': check.id,
       'created_at': check.createdAt
@@ -274,10 +279,20 @@ export class LocalRepository implements Repository {
     }
   }
 
+  /** 删除某习惯某天的**全部时段**（清空数据、导入前清理都依赖这个语义） */
   async deleteHabitCheck(habitId: string, date: string): Promise<void> {
     const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('habit_checks');
     predicates.equalTo('habit_id', habitId);
     predicates.equalTo('date', date);
+    await this.store.delete(predicates);
+  }
+
+  /** 只删某习惯某天的某一个时段 */
+  async deleteHabitCheckSlot(habitId: string, date: string, slotIndex: number): Promise<void> {
+    const predicates: relationalStore.RdbPredicates = new relationalStore.RdbPredicates('habit_checks');
+    predicates.equalTo('habit_id', habitId);
+    predicates.equalTo('date', date);
+    predicates.equalTo('slot_index', slotIndex);
     await this.store.delete(predicates);
   }
 
@@ -479,11 +494,26 @@ export class LocalRepository implements Repository {
   }
 
   private mapHabit(rs: relationalStore.ResultSet): Habit {
+    // times_per_day / slot_times / reminder_enabled 都是 v7 后加的列：
+    // 老数据的 times_per_day 为 NULL、slot_times 为 NULL、reminder_enabled 为 0；
+    // 列不存在时索引为 -1。两种都要兜底成「每天 1 次、没有时段、不提醒」。
+    const timesIndex: number = rs.getColumnIndex('times_per_day');
+    const slotTimesIndex: number = rs.getColumnIndex('slot_times');
+    const reminderIndex: number = rs.getColumnIndex('reminder_enabled');
     return {
       id: rs.getString(rs.getColumnIndex('id')),
       name: rs.getString(rs.getColumnIndex('name')),
       sortOrder: rs.getLong(rs.getColumnIndex('sort_order')),
-      createdAt: rs.getLong(rs.getColumnIndex('created_at'))
+      createdAt: rs.getLong(rs.getColumnIndex('created_at')),
+      timesPerDay: (timesIndex < 0 || rs.isColumnNull(timesIndex))
+        ? 1
+        : normalizeTimesPerDay(rs.getLong(timesIndex)),
+      slotTimes: (slotTimesIndex < 0 || rs.isColumnNull(slotTimesIndex))
+        ? []
+        : parseSlotTimes(rs.getString(slotTimesIndex)),
+      reminderEnabled: (reminderIndex < 0 || rs.isColumnNull(reminderIndex))
+        ? false
+        : rs.getLong(reminderIndex) === 1
     };
   }
 
@@ -492,17 +522,23 @@ export class LocalRepository implements Repository {
       'id': habit.id,
       'name': habit.name,
       'sort_order': habit.sortOrder,
-      'created_at': habit.createdAt
+      'created_at': habit.createdAt,
+      'times_per_day': normalizeTimesPerDay(habit.timesPerDay),
+      'slot_times': serializeSlotTimes(habit.slotTimes),
+      'reminder_enabled': habit.reminderEnabled ? 1 : 0
     };
     return values;
   }
 
   private mapHabitCheck(rs: relationalStore.ResultSet): HabitCheck {
+    // slot_index 是 v7 后加的列：老记录为 NULL（第 1 次），列不存在时索引为 -1
+    const slotIndex: number = rs.getColumnIndex('slot_index');
     return {
       id: rs.getString(rs.getColumnIndex('id')),
       habitId: rs.getString(rs.getColumnIndex('habit_id')),
       date: rs.getString(rs.getColumnIndex('date')),
-      createdAt: rs.getLong(rs.getColumnIndex('created_at'))
+      createdAt: rs.getLong(rs.getColumnIndex('created_at')),
+      slotIndex: (slotIndex < 0 || rs.isColumnNull(slotIndex)) ? 0 : rs.getLong(slotIndex)
     };
   }
 
@@ -511,7 +547,8 @@ export class LocalRepository implements Repository {
       'id': check.id,
       'habit_id': check.habitId,
       'date': check.date,
-      'created_at': check.createdAt
+      'created_at': check.createdAt,
+      'slot_index': check.slotIndex
     };
     return values;
   }

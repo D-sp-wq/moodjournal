@@ -4,10 +4,15 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { Constants } from '../common/constants/Constants';
 import { DateUtils } from '../common/utils/DateUtils';
 import { DayPlan, PlanReminderSettings, reminderContent, shouldPublish } from '../models/PlanReminder';
+import { HabitReminderSlot } from '../models/Habit';
 import { SessionManager } from './storage/SessionManager';
 
 /** 「今日提醒」通知标题（固定文案） */
 const PLAN_REMINDER_TITLE: string = '今天要做的事';
+/** 习惯提醒的通知 id 起点：避开记录提醒的 1001、重要日子的 2001、今日提醒的 3000 */
+const HABIT_REMINDER_NOTIFICATION_BASE: number = 4000;
+/** 习惯提醒的通知标题（固定文案） */
+const HABIT_REMINDER_TITLE: string = '该打卡了';
 
 /**
  * 后台代理提醒服务：每日记录提醒 + 重要日子提醒 + 今日提醒（尽力而为，失败仅记录日志）
@@ -156,6 +161,81 @@ export class ReminderService {
       await SessionManager.getInstance().setPlanReminderIds(ids);
     } catch (err) {
       hilog.warn(Constants.LOG_DOMAIN, Constants.LOG_TAG, '保存今日提醒 id 失败: %{public}s', JSON.stringify(err));
+    }
+  }
+
+  /**
+   * 发布习惯打卡提醒：每个时段一条「每天」的闹钟提醒。
+   *
+   * - daysOfWeek 固定 1..7（每天都响），hour/minute 用时段自己的时间
+   * - 正文形如「读书 · 第 1/2 次」，配合提醒标题「该打卡了」
+   * - notificationId = 4000 + 序号，避开其它三类提醒
+   * - 发布成功的 reminderId 写进 preferences（key habitReminderIds），供 cancelHabitReminders 取消
+   * - 单条失败只记日志并跳过，整体不抛异常；失败时不覆盖已保存的 id 列表以外的东西
+   *
+   * @returns 发布成功的 reminderId 列表
+   */
+  static async publishHabitReminders(slots: HabitReminderSlot[]): Promise<number[]> {
+    const ids: number[] = [];
+    try {
+      for (let i: number = 0; i < slots.length; i++) {
+        const slot: HabitReminderSlot = slots[i];
+        try {
+          const reminder: reminderAgentManager.ReminderRequestAlarm = {
+            reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_ALARM,
+            hour: slot.hour,
+            minute: slot.minute,
+            daysOfWeek: [1, 2, 3, 4, 5, 6, 7],
+            title: HABIT_REMINDER_TITLE,
+            content: `${slot.name} · 第 ${slot.slotIndex + 1}/${slot.total} 次`,
+            notificationId: HABIT_REMINDER_NOTIFICATION_BASE + i,
+            slotType: notificationManager.SlotType.CONTENT_INFORMATION
+          };
+          const reminderId: number = await reminderAgentManager.publishReminder(reminder);
+          ids.push(reminderId);
+        } catch (err) {
+          hilog.warn(Constants.LOG_DOMAIN, Constants.LOG_TAG, '发布习惯提醒失败(%{public}s): %{public}s',
+            slot.habitId, JSON.stringify(err));
+        }
+      }
+      await ReminderService.saveHabitReminderIds(ids);
+    } catch (err) {
+      hilog.warn(Constants.LOG_DOMAIN, Constants.LOG_TAG, '发布习惯提醒失败: %{public}s', JSON.stringify(err));
+    }
+    return ids;
+  }
+
+  /**
+   * 取消所有已排的习惯提醒：把上次存下的 reminderId 逐个取消，然后清空记录。
+   * 单个取消失败只记日志；整体不抛异常。
+   */
+  static async cancelHabitReminders(): Promise<void> {
+    try {
+      const session = SessionManager.getInstance();
+      const ids: number[] = await session.getHabitReminderIds();
+      for (const id of ids) {
+        try {
+          await reminderAgentManager.cancelReminder(id);
+        } catch (err) {
+          // 已经被系统清掉（或 id 早就失效）属正常情况，继续取消剩下的
+          hilog.warn(Constants.LOG_DOMAIN, Constants.LOG_TAG, '取消习惯提醒失败(%{public}d): %{public}s',
+            id, JSON.stringify(err));
+        }
+      }
+      if (ids.length > 0) {
+        await session.setHabitReminderIds([]);
+      }
+    } catch (err) {
+      hilog.warn(Constants.LOG_DOMAIN, Constants.LOG_TAG, '取消习惯提醒失败: %{public}s', JSON.stringify(err));
+    }
+  }
+
+  /** 记住这次排上的习惯提醒 id（存失败只记日志，不影响提醒本身已经生效） */
+  private static async saveHabitReminderIds(ids: number[]): Promise<void> {
+    try {
+      await SessionManager.getInstance().setHabitReminderIds(ids);
+    } catch (err) {
+      hilog.warn(Constants.LOG_DOMAIN, Constants.LOG_TAG, '保存习惯提醒 id 失败: %{public}s', JSON.stringify(err));
     }
   }
 }

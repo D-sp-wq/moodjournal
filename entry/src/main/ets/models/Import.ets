@@ -1,7 +1,7 @@
 import { DateUtils } from '../common/utils/DateUtils';
 import { DailyLog } from './DailyLog';
 import { LedgerRecord, LedgerFeeling, LedgerType } from './Ledger';
-import { Habit, HabitCheck } from './Habit';
+import { Habit, HabitCheck, normalizeSlotTimes, normalizeTimesPerDay } from './Habit';
 import { TaskPlan, clampPlannedDays } from './TaskPlan';
 import { Anniversary } from './Anniversary';
 
@@ -262,6 +262,21 @@ function parseLedgerRecord(raw: Object | null): LedgerRecord | null {
   };
 }
 
+/**
+ * 时段列表：**保留位置**（第 i 项对应第 i 个时段），非字符串补空串。
+ * 不能像照片/标签那样丢掉坏项，否则后面的时间会整体前移。
+ */
+function safeSlotTimes(raw: Array<string> | undefined): string[] {
+  const out: string[] = [];
+  if (!Array.isArray(raw)) {
+    return out;
+  }
+  for (const item of raw) {
+    out.push(typeof item === 'string' ? item : '');
+  }
+  return out;
+}
+
 /** 解析一个习惯；返回 null 表示这条不合法，应当跳过 */
 function parseHabit(raw: Object | null): Habit | null {
   if (raw === null || raw === undefined) {
@@ -272,11 +287,17 @@ function parseHabit(raw: Object | null): Habit | null {
   if (name === '') {
     return null;
   }
+  // timesPerDay / slotTimes / reminderEnabled 是 1.8 后加的字段：
+  // 老备份没有它们，按「每天 1 次、不设时间、不提醒」补齐，与数据库迁移的口径一致。
+  const timesPerDay: number = normalizeTimesPerDay(safeNumber(item.timesPerDay, 1));
   return {
     id: safeString(item.id, ''),
     name: name,
     sortOrder: safeNumber(item.sortOrder, 0),
-    createdAt: safeNumber(item.createdAt, 0)
+    createdAt: safeNumber(item.createdAt, 0),
+    timesPerDay: timesPerDay,
+    slotTimes: normalizeSlotTimes(timesPerDay, safeSlotTimes(item.slotTimes)),
+    reminderEnabled: safeBoolean(item.reminderEnabled, false)
   };
 }
 
@@ -298,7 +319,9 @@ function parseHabitCheck(raw: Object | null): HabitCheck | null {
     id: safeString(item.id, ''),
     habitId: habitId,
     date: date,
-    createdAt: safeNumber(item.createdAt, 0)
+    createdAt: safeNumber(item.createdAt, 0),
+    // slotIndex 是 1.8 后加的字段：老备份没有它，按第 1 次（0）处理
+    slotIndex: safeNumber(item.slotIndex, 0)
   };
 }
 

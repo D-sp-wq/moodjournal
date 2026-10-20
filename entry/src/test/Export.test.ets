@@ -95,11 +95,19 @@ function ledgerFixture(): LedgerRecord {
 }
 
 function habitFixture(): Habit {
-  return { id: 'H1', name: '早起', sortOrder: 0, createdAt: 4 };
+  return {
+    id: 'H1',
+    name: '早起',
+    sortOrder: 0,
+    createdAt: 4,
+    timesPerDay: 1,
+    slotTimes: [],
+    reminderEnabled: false
+  };
 }
 
 function checkFixture(): HabitCheck {
-  return { id: 'C1', habitId: 'H1', date: '2026-01-01', createdAt: 5 };
+  return { id: 'C1', habitId: 'H1', date: '2026-01-01', createdAt: 5, slotIndex: 0 };
 }
 
 function planFixture(): TaskPlan {

@@ -12,7 +12,7 @@ import { Constants } from '../../common/constants/Constants';
  */
 export class DatabaseHelper {
   /** 数据库结构版本。每次改表结构都要 +1，并在 migrate() 里补上对应语句。 */
-  private static readonly DB_VERSION: number = 6;
+  private static readonly DB_VERSION: number = 7;
 
   private static instance: DatabaseHelper | undefined = undefined;
   private store: relationalStore.RdbStore | undefined = undefined;
@@ -106,18 +106,22 @@ export class DatabaseHelper {
         feeling INTEGER,
         created_at INTEGER
       )`,
-      // 习惯打卡：习惯定义 + 每天一条打卡记录（同一习惯同一天只有一条）
+      // 习惯打卡：习惯定义 + 打卡记录（同一习惯同一天可有 timesPerDay 条，用 slot_index 区分）
       `CREATE TABLE IF NOT EXISTS habits (
         id TEXT PRIMARY KEY,
         name TEXT,
         sort_order INTEGER,
-        created_at INTEGER
+        created_at INTEGER,
+        times_per_day INTEGER DEFAULT 1,
+        slot_times TEXT,
+        reminder_enabled INTEGER DEFAULT 0
       )`,
       `CREATE TABLE IF NOT EXISTS habit_checks (
         id TEXT PRIMARY KEY,
         habit_id TEXT,
         date TEXT,
-        created_at INTEGER
+        created_at INTEGER,
+        slot_index INTEGER DEFAULT 0
       )`
     ];
     for (let i: number = 0; i < sqls.length; i++) {
@@ -162,6 +166,29 @@ export class DatabaseHelper {
     try {
       // 标签（JSON 字符串）：老数据为 NULL，读取时兜底为空数组
       await store.executeSql('ALTER TABLE daily_logs ADD COLUMN tags TEXT');
+    } catch (err) {
+      // 列已存在，无需处理
+    }
+    // v7：习惯升级为「一天多次打卡 + 每个时段可选定时提醒」。
+    // 老数据默认每天 1 次、不提醒；打卡记录默认第 1 次，升级后行为与升级前一致。
+    try {
+      await store.executeSql('ALTER TABLE habits ADD COLUMN times_per_day INTEGER DEFAULT 1');
+    } catch (err) {
+      // 列已存在，无需处理
+    }
+    try {
+      // 时段（JSON 字符串数组）：老数据为 NULL，读取时兜底为空数组
+      await store.executeSql('ALTER TABLE habits ADD COLUMN slot_times TEXT');
+    } catch (err) {
+      // 列已存在，无需处理
+    }
+    try {
+      await store.executeSql('ALTER TABLE habits ADD COLUMN reminder_enabled INTEGER DEFAULT 0');
+    } catch (err) {
+      // 列已存在，无需处理
+    }
+    try {
+      await store.executeSql('ALTER TABLE habit_checks ADD COLUMN slot_index INTEGER DEFAULT 0');
     } catch (err) {
       // 列已存在，无需处理
     }

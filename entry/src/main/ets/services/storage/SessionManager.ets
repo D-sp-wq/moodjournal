@@ -32,6 +32,8 @@ export class SessionManager {
   private static readonly KEY_PLAN_REMINDER_HOUR: string = 'planReminderHour';
   private static readonly KEY_PLAN_REMINDER_MINUTE: string = 'planReminderMinute';
   private static readonly KEY_PLAN_REMINDER_IDS: string = 'planReminderIds';
+  /** 习惯提醒：已排期的 reminderId 列表（JSON 字符串） */
+  private static readonly KEY_HABIT_REMINDER_IDS: string = 'habitReminderIds';
 
   private constructor() {
   }
@@ -237,6 +239,20 @@ export class SessionManager {
   /** 保存已排期的今日提醒 id 列表；空列表存空串 */
   async setPlanReminderIds(ids: number[]): Promise<void> {
     await this.pref!.put(SessionManager.KEY_PLAN_REMINDER_IDS, serializeReminderIds(ids));
+    await this.pref!.flush();
+  }
+
+  // ---------------- 习惯提醒 ----------------
+
+  /** 已排期的习惯提醒 id 列表；读坏了按空列表处理（最多取消不掉，不会崩） */
+  async getHabitReminderIds(): Promise<number[]> {
+    const raw: string = await this.pref!.get(SessionManager.KEY_HABIT_REMINDER_IDS, '') as string;
+    return parseReminderIds(raw);
+  }
+
+  /** 保存已排期的习惯提醒 id 列表；空列表存空串 */
+  async setHabitReminderIds(ids: number[]): Promise<void> {
+    await this.pref!.put(SessionManager.KEY_HABIT_REMINDER_IDS, serializeReminderIds(ids));
     await this.pref!.flush();
   }
 }

@@ -6,6 +6,7 @@ import { DatabaseHelper } from '../services/storage/DatabaseHelper';
 import { SessionManager } from '../services/storage/SessionManager';
 import { AppLockManager } from '../services/storage/AppLockManager';
 import { PlanReminderService } from '../services/PlanReminderService';
+import { HabitReminderService } from '../services/HabitReminderService';
 import { Icon, IconKind } from '../components/Icons';
 
 /**
@@ -47,6 +48,12 @@ struct Index {
         await PlanReminderService.sync();
       } catch (err) {
         hilog.warn(Constants.LOG_DOMAIN, Constants.LOG_TAG, '同步今日提醒失败: %{public}s', JSON.stringify(err));
+      }
+      // 习惯提醒同样单独兜底：重排失败只记日志，不把用户丢进"初始化失败"页
+      try {
+        await HabitReminderService.sync();
+      } catch (err) {
+        hilog.warn(Constants.LOG_DOMAIN, Constants.LOG_TAG, '同步习惯提醒失败: %{public}s', JSON.stringify(err));
       }
       await this.routeByBindingState();
     } catch (err) {

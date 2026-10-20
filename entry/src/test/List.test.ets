@@ -15,6 +15,7 @@ import logPhotoTest from './LogPhoto.test';
 import iconPathTest from './IconPath.test';
 import reportTest from './Report.test';
 import habitTest from './Habit.test';
+import habitSlotTest from './HabitSlot.test';
 import calendarTest from './Calendar.test';
 import dayPlanTest from './DayPlan.test';
 import ledgerInsightTest from './LedgerInsight.test';
@@ -44,6 +45,7 @@ export default function testsuite() {
   iconPathTest();
   reportTest();
   habitTest();
+  habitSlotTest();
   calendarTest();
   dayPlanTest();
   ledgerInsightTest();

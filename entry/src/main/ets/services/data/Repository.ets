@@ -63,6 +63,9 @@ export interface Repository {
 
   deleteHabitCheck(habitId: string, date: string): Promise<void>;
 
+  /** 只删某习惯某天的某一个时段（一天多次打卡用） */
+  deleteHabitCheckSlot(habitId: string, date: string, slotIndex: number): Promise<void>;
+
   /** 删除某习惯时连带删掉它的打卡记录 */
   deleteHabitChecksOf(habitId: string): Promise<void>;
 }
