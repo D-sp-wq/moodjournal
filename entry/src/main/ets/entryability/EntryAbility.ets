@@ -3,6 +3,13 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { ThemeManager } from '../services/storage/ThemeManager';
 import { AppLockManager } from '../services/storage/AppLockManager';
+import {
+  PENDING_ROUTE_KEY,
+  ROUTE_PARAM_KEY,
+  ReminderKind,
+  kindFromParam,
+  pageForReminder
+} from '../models/ReminderRoute';
 
 const DOMAIN = 0x0000;
 
@@ -14,6 +21,45 @@ export default class EntryAbility extends UIAbility {
     hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onCreate');
     // 冷启动：进程刚起来，内存里的时间戳无意义，若开了应用锁则需要验证
     AppLockManager.getInstance().markColdStart();
+    // 点通知冷启动：记下目标页，等首页确认已解锁后再跳
+    this.capturePendingRoute(want);
+  }
+
+  /**
+   * 应用已在运行时又收到新的 Want（点通知、点卡片都会走这里）。
+   *
+   * 只记录目标页，不在 Ability 里 pushUrl：pushUrl 可能与
+   * 「先弹锁屏页」的时序打架，统一交给 HomePage.onPageShow 消费。
+   */
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    hilog.info(DOMAIN, 'testTag', '%{public}s', 'Ability onNewWant');
+    this.capturePendingRoute(want);
+  }
+
+  /**
+   * 解析 want.parameters 里的路由标记，写进 AppStorage。
+   * 参数缺失、类型不对、取值未知一律不写（不能让脏参数把用户带到不存在的页面）。
+   */
+  private capturePendingRoute(want: Want): void {
+    try {
+      const parameters: Record<string, Object> | undefined = want.parameters;
+      if (parameters === undefined) {
+        return;
+      }
+      const raw: Object = parameters[ROUTE_PARAM_KEY];
+      if (typeof raw !== 'string') {
+        return;
+      }
+      const kind: ReminderKind | null = kindFromParam(raw as string);
+      if (kind === null) {
+        return;
+      }
+      const route: string = pageForReminder(kind);
+      AppStorage.setOrCreate<string>(PENDING_ROUTE_KEY, route);
+      hilog.info(DOMAIN, 'testTag', '待跳转页面: %{public}s', route);
+    } catch (err) {
+      hilog.warn(DOMAIN, 'testTag', '解析跳转目标失败: %{public}s', JSON.stringify(err));
+    }
   }
 
   onDestroy(): void {

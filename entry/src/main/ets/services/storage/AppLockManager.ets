@@ -1,3 +1,6 @@
+import userAuth from '@ohos.userIAM.userAuth';
+import { hilog } from '@kit.PerformanceAnalysisKit';
+import { Constants } from '../../common/constants/Constants';
 import {
   DEFAULT_GRACE_MINUTES,
   buildSalt,
@@ -23,6 +26,10 @@ import { SessionManager } from './SessionManager';
  */
 export class AppLockManager {
   private static instance: AppLockManager | undefined = undefined;
+
+  /** 只尝试指纹与人脸；系统 PIN 不用 —— 解锁用的是应用自己的 4 位密码 */
+  private static readonly BIOMETRIC_TYPES: userAuth.UserAuthType[] =
+    [userAuth.UserAuthType.FINGERPRINT, userAuth.UserAuthType.FACE];
 
   /** 进入后台的时间戳；0 表示本次会话还没进过后台 */
   private lastBackgroundAt: number = 0;
@@ -164,5 +171,69 @@ export class AppLockManager {
     }
     this.graceMinutes = minutes;
     return true;
+  }
+
+  // ---------------- 生物识别（指纹 / 人脸） ----------------
+
+  /**
+   * 设备上是否有"已录入"的指纹或人脸可用。
+   *
+   * `userAuth.getAvailableStatus` 是同步接口：查询成功即表示可用；
+   * 抛错（未录入 12500010 / 不支持 12500005 / 无权限 201 等）表示不可用。
+   * 两种生物识别只要有一种可用就返回 true。
+   */
+  async isBiometricAvailable(): Promise<boolean> {
+    for (const authType of AppLockManager.BIOMETRIC_TYPES) {
+      try {
+        userAuth.getAvailableStatus(authType, userAuth.AuthTrustLevel.ATL2);
+        return true;
+      } catch (err) {
+        // 这一种没录入或不支持，继续看下一种
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 拉起系统生物识别验证。
+   *
+   * 只返回 true / false：成功 true；取消、超时、锁死、未录入、
+   * 权限不足以及任何异常一律 false，绝不把异常抛给锁屏页 ——
+   * 页面必须能安静地退回到 PIN 输入，不能因为认证组件出错就卡死。
+   */
+  async authWithBiometric(): Promise<boolean> {
+    return new Promise<boolean>((resolve: (value: boolean) => void) => {
+      let settled: boolean = false;
+      const finish = (ok: boolean): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(ok);
+      };
+      try {
+        const authParam: userAuth.AuthParam = {
+          challenge: new Uint8Array([]),
+          authType: AppLockManager.BIOMETRIC_TYPES,
+          // 应用登录属中等安全场景，ATL2 是各家生物识别都支持的水平
+          authTrustLevel: userAuth.AuthTrustLevel.ATL2
+        };
+        const widgetParam: userAuth.WidgetParam = {
+          title: '验证身份以解锁心情手记'
+        };
+        const instance: userAuth.UserAuthInstance = userAuth.getUserAuthInstance(authParam, widgetParam);
+        const callback: userAuth.IAuthCallback = {
+          onResult: (result: userAuth.UserAuthResult): void => {
+            finish(result.result === userAuth.UserAuthResultCode.SUCCESS);
+          }
+        };
+        instance.on('result', callback);
+        instance.start();
+      } catch (err) {
+        hilog.warn(Constants.LOG_DOMAIN, Constants.LOG_TAG,
+          '生物识别不可用: %{public}s', JSON.stringify(err));
+        finish(false);
+      }
+    });
   }
 }

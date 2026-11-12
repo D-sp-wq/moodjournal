@@ -12,6 +12,10 @@ export class Constants {
   // 关系型数据库名称
   static readonly DB_NAME: string = 'mood_journal.db';
 
+  // 应用包名与主 Ability 名：通知的 wantAgent 需要它们才能点回应用
+  static readonly BUNDLE_NAME: string = 'com.datelog.couple';
+  static readonly MAIN_ABILITY_NAME: string = 'EntryAbility';
+
   // 主题配色（暖黄奶咖系，随日间/夜间自动切换）
   static readonly COLOR_PRIMARY: Resource = $r('app.color.brand_primary');
   static readonly COLOR_PRIMARY_LIGHT: Resource = $r('app.color.brand_primary_light');
@@ -43,6 +47,10 @@ export class Constants {
   // 每日记录提醒默认时间（21:00）
   static readonly REMINDER_HOUR: number = 21;
   static readonly REMINDER_MINUTE: number = 0;
+
+  // 重要日子提醒时间（09:00）：提前提醒也用这个点
+  static readonly ANNIVERSARY_REMINDER_HOUR: number = 9;
+  static readonly ANNIVERSARY_REMINDER_MINUTE: number = 0;
 
   // 单条记录正文长度上限（避免异常输入撑爆数据库）
   static readonly MAX_JOURNAL_LENGTH: number = 2000;

@@ -2,8 +2,13 @@ import { Constants } from '../common/constants/Constants';
 import { DateUtils } from '../common/utils/DateUtils';
 import { IdUtils } from '../common/utils/IdUtils';
 import { Anniversary, AnniversaryType, getAnniversaryTypeLabel } from '../models/Anniversary';
+import {
+  ANNIVERSARY_ADVANCE_OPTIONS,
+  DEFAULT_ANNIVERSARY_ADVANCE_DAYS
+} from '../models/ReminderRoute';
 import { RepositoryFactory } from '../services/data/RepositoryFactory';
 import { ReminderService } from '../services/ReminderService';
+import { SessionManager } from '../services/storage/SessionManager';
 import { EmptyState } from '../components/EmptyState';
 import { Icon, IconKind } from '../components/Icons';
 
@@ -31,6 +36,8 @@ struct AnniversaryPage {
   @State private newType: string = AnniversaryType.ANNIVERSARY;
   @State private isLoading: boolean = false;
   @State private today: string = DateUtils.today();
+  /** 提前几天提醒（0 / 1 / 3），存在 preferences 里，对全部重要日子生效 */
+  @State private advanceDays: number = DEFAULT_ANNIVERSARY_ADVANCE_DAYS;
 
   aboutToAppear(): void {
     this.load();
@@ -40,8 +47,35 @@ struct AnniversaryPage {
     try {
       this.anniversaries = await RepositoryFactory.getRepository().getImportantDays();
       this.today = DateUtils.today();
+      this.advanceDays = await SessionManager.getInstance().getAnniversaryAdvanceDays();
     } catch (err) {
       this.getUIContext().getPromptAction().showToast({ message: '加载失败', duration: 2000 });
+    }
+  }
+
+  /**
+   * 切换提前天数：先落盘，再把所有开着提醒的重要日子重排一遍。
+   * 失败时把选中态退回去，避免界面显示的和实际存的不一致。
+   */
+  private async setAdvanceDays(days: number): Promise<void> {
+    const previous: number = this.advanceDays;
+    this.advanceDays = days;
+    try {
+      await SessionManager.getInstance().setAnniversaryAdvanceDays(days);
+      await this.rescheduleAll();
+    } catch (err) {
+      this.advanceDays = previous;
+      this.getUIContext().getPromptAction().showToast({ message: '设置失败，请重试', duration: 2000 });
+    }
+  }
+
+  /** 按当前提前天数重排全部（只排开着提醒的；失败由 ReminderService 内部吞掉） */
+  private async rescheduleAll(): Promise<void> {
+    for (const item of this.anniversaries) {
+      if (!item.reminderEnabled) {
+        continue;
+      }
+      await ReminderService.publishAnniversaryReminder(item.title, item.date, this.advanceDays);
     }
   }
 
@@ -82,7 +116,7 @@ struct AnniversaryPage {
         createdAt: Date.now()
       };
       await RepositoryFactory.getRepository().upsertImportantDay(anniversary);
-      await ReminderService.publishAnniversaryReminder(anniversary.title, anniversary.date);
+      await ReminderService.publishAnniversaryReminder(anniversary.title, anniversary.date, this.advanceDays);
       this.newTitle = '';
       this.newType = AnniversaryType.ANNIVERSARY;
       this.showAddPanel = false;
@@ -124,7 +158,7 @@ struct AnniversaryPage {
     item.reminderEnabled = isOn;
     await RepositoryFactory.getRepository().upsertImportantDay(item);
     if (isOn) {
-      await ReminderService.publishAnniversaryReminder(item.title, item.date);
+      await ReminderService.publishAnniversaryReminder(item.title, item.date, this.advanceDays);
     }
   }
 
@@ -145,6 +179,57 @@ struct AnniversaryPage {
     }
     .width('100%')
     .margin({ top: 12 })
+  }
+
+  @Builder
+  private buildAdvanceSelector() {
+    Column() {
+      Row() {
+        Icon({ kind: IconKind.CALENDAR, iconSize: 22, color: Constants.COLOR_PRIMARY })
+        Text('提前提醒')
+          .fontSize(17)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Constants.COLOR_TEXT_PRIMARY)
+          .margin({ left: 8 })
+        Blank()
+        Text(this.advanceDays === 0 ? '当天提醒' : `提前 ${this.advanceDays} 天`)
+          .fontSize(14)
+          .fontColor(Constants.COLOR_PRIMARY)
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+
+      Row() {
+        ForEach(ANNIVERSARY_ADVANCE_OPTIONS, (days: number) => {
+          Text(`${days} 天`)
+            .fontSize(15)
+            .textAlign(TextAlign.Center)
+            .layoutWeight(1)
+            .padding({ top: 9, bottom: 9 })
+            .borderRadius(10)
+            .backgroundColor(this.advanceDays === days ? Constants.COLOR_PRIMARY : Constants.COLOR_BACKGROUND)
+            .fontColor(this.advanceDays === days ? Constants.COLOR_ON_BRAND : Constants.COLOR_TEXT_SECONDARY)
+            .onClick(() => {
+              this.setAdvanceDays(days);
+            })
+        }, (days: number) => `${days}`)
+      }
+      .width('100%')
+      .margin({ top: 12 })
+
+      Text('提醒时间固定在 09:00。改完会给所有开着提醒的重要日子重排一遍。')
+        .fontSize(13)
+        .lineHeight(20)
+        .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        .width('100%')
+        .margin({ top: 10 })
+    }
+    .width('100%')
+    .padding(16)
+    .borderRadius(16)
+    .backgroundColor(Constants.COLOR_CARD)
+    .margin({ top: 14 })
+    .alignItems(HorizontalAlign.Start)
   }
 
   @Builder
@@ -293,6 +378,7 @@ struct AnniversaryPage {
           if (this.showAddPanel) {
             this.buildAddPanel()
           }
+          this.buildAdvanceSelector()
           if (this.anniversaries.length === 0) {
             EmptyState({
               kind: IconKind.STAR,

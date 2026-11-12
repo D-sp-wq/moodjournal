@@ -2,6 +2,7 @@ import dataPreferences from '@ohos.data.preferences';
 import { common } from '@kit.AbilityKit';
 import { Constants } from '../../common/constants/Constants';
 import { parseReminderIds, serializeReminderIds } from '../../models/PlanReminder';
+import { DEFAULT_ANNIVERSARY_ADVANCE_DAYS, normalizeAdvanceDays } from '../../models/ReminderRoute';
 
 /**
  * 会话信息单例：用 preferences 持久化昵称、头像、开始记录日期等本机信息。
@@ -34,6 +35,10 @@ export class SessionManager {
   private static readonly KEY_PLAN_REMINDER_IDS: string = 'planReminderIds';
   /** 习惯提醒：已排期的 reminderId 列表（JSON 字符串） */
   private static readonly KEY_HABIT_REMINDER_IDS: string = 'habitReminderIds';
+  /** 重要日子提前提醒：提前几天（0 / 1 / 3） */
+  private static readonly KEY_ANNIVERSARY_ADVANCE_DAYS: string = 'anniversaryAdvanceDays';
+  /** 生物识别（指纹 / 人脸）解锁开关 */
+  private static readonly KEY_BIOMETRIC_ENABLED: string = 'biometricEnabled';
 
   private constructor() {
   }
@@ -253,6 +258,36 @@ export class SessionManager {
   /** 保存已排期的习惯提醒 id 列表；空列表存空串 */
   async setHabitReminderIds(ids: number[]): Promise<void> {
     await this.pref!.put(SessionManager.KEY_HABIT_REMINDER_IDS, serializeReminderIds(ids));
+    await this.pref!.flush();
+  }
+
+  // ---------------- 重要日子：提前提醒 ----------------
+
+  /**
+   * 重要日子提前几天提醒。默认 1 天；只允许 0 / 1 / 3，
+   * 读到的旧值或脏值一律归一（越界不会让提醒变成"提前 100 天"）。
+   */
+  async getAnniversaryAdvanceDays(): Promise<number> {
+    const saved: number = await this.pref!.get(
+      SessionManager.KEY_ANNIVERSARY_ADVANCE_DAYS, DEFAULT_ANNIVERSARY_ADVANCE_DAYS) as number;
+    return normalizeAdvanceDays(saved);
+  }
+
+  /** 保存提前天数；写入前归一，保证落盘的永远是 0 / 1 / 3 */
+  async setAnniversaryAdvanceDays(days: number): Promise<void> {
+    await this.pref!.put(SessionManager.KEY_ANNIVERSARY_ADVANCE_DAYS, normalizeAdvanceDays(days));
+    await this.pref!.flush();
+  }
+
+  // ---------------- 生物识别解锁 ----------------
+
+  /** 是否允许用指纹 / 人脸解锁；默认关闭（PIN 永远是兜底） */
+  async isBiometricEnabled(): Promise<boolean> {
+    return await this.pref!.get(SessionManager.KEY_BIOMETRIC_ENABLED, false) as boolean;
+  }
+
+  async setBiometricEnabled(enabled: boolean): Promise<void> {
+    await this.pref!.put(SessionManager.KEY_BIOMETRIC_ENABLED, enabled);
     await this.pref!.flush();
   }
 }

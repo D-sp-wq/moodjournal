@@ -52,7 +52,8 @@ export default class DateLogFormAbility extends FormExtensionAbility {
 
       const bindingData: formBindingData.FormBindingData = formBindingData.createFormBindingData({
         'date': `${Number(today.slice(5, 7))}月${Number(today.slice(8, 10))}日`,
-        'status': logged ? '今日已记录' : '还没记录今天',
+        // 未记录时给一句可点击的提示（整张卡片可点，点了直接进记录页）
+        'status': logged ? '今日已记录' : '点我记今天',
         'moodLabel': labelText,
         'moodStart': moodStart,
         'moodEnd': moodEnd

@@ -41,6 +41,7 @@ import {
 import { ImportBundle, ImportResult, describeCounts, totalCount } from '../models/Import';
 import { LedgerRecord } from '../models/Ledger';
 import { Habit, HabitCheck } from '../models/Habit';
+import { PENDING_ROUTE_KEY } from '../models/ReminderRoute';
 
 interface ActiveTask {
   id: string;
@@ -120,6 +121,7 @@ struct HomePage {
     this.loadData();
     this.lockOn = AppLockManager.getInstance().isOn();
     this.gateByAppLock();
+    this.consumePendingRoute();
   }
 
   /**
@@ -131,6 +133,30 @@ struct HomePage {
       return;
     }
     this.getUIContext().getRouter().pushUrl({ url: 'pages/LockPage' });
+  }
+
+  /**
+   * 消费「点通知 / 点卡片」带进来的目标路由。
+   *
+   * 时序要求：必须在 gateByAppLock() 之后、且确认不需要解锁时才消费。
+   * 开了应用锁冷启动时，这里只压上锁屏页而不跳目标页，pendingRoute 原样保留；
+   * 用户解锁后回到首页，onPageShow 再次触发，这时才真正跳到目标页。
+   */
+  private consumePendingRoute(): void {
+    const route: string | undefined = AppStorage.get<string>(PENDING_ROUTE_KEY);
+    if (route === undefined || route === '') {
+      return;
+    }
+    if (AppLockManager.getInstance().needsUnlock()) {
+      return;
+    }
+    // 先清空再跳：pushUrl 万一失败也不会每次回首页都重试一次
+    AppStorage.setOrCreate<string>(PENDING_ROUTE_KEY, '');
+    if (route === 'pages/HomePage') {
+      // 目标就是首页，已经在这里，不用再压一层
+      return;
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route });
   }
 
   private async loadData(): Promise<void> {

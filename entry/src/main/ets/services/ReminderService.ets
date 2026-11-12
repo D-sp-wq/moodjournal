@@ -5,6 +5,7 @@ import { Constants } from '../common/constants/Constants';
 import { DateUtils } from '../common/utils/DateUtils';
 import { DayPlan, PlanReminderSettings, reminderContent, shouldPublish } from '../models/PlanReminder';
 import { HabitReminderSlot } from '../models/Habit';
+import { ReminderKind, anniversaryReminderText, buildWantAgentParams, normalizeAdvanceDays, reminderDateFor, shouldScheduleAt } from '../models/ReminderRoute';
 import { SessionManager } from './storage/SessionManager';
 
 /** 「今日提醒」通知标题（固定文案） */
@@ -18,6 +19,22 @@ const HABIT_REMINDER_TITLE: string = '该打卡了';
  * 后台代理提醒服务：每日记录提醒 + 重要日子提醒 + 今日提醒（尽力而为，失败仅记录日志）
  */
 export class ReminderService {
+  /**
+   * 构造通知点击的跳转目标。
+   *
+   * parameters 里只带一个 `target`，EntryAbility 解析后写进
+   * AppStorage('pendingRoute')，由首页在「确认已解锁」之后再消费 ——
+   * 这里不在 Ability 里直接 pushUrl，避免和锁屏页抢路由。
+   */
+  private static wantAgentFor(kind: ReminderKind): reminderAgentManager.WantAgent {
+    const wantAgent: reminderAgentManager.WantAgent = {
+      pkgName: Constants.BUNDLE_NAME,
+      abilityName: Constants.MAIN_ABILITY_NAME,
+      parameters: buildWantAgentParams(kind)
+    };
+    return wantAgent;
+  }
+
   /** 发布每日记录提醒（每天 21:00） */
   static async publishDailyRecordReminder(): Promise<void> {
     try {
@@ -29,7 +46,8 @@ export class ReminderService {
         title: '记录今天的心情',
         content: '花一分钟写写今天发生了什么，再给明天定几件事 ✍️',
         notificationId: 1001,
-        slotType: notificationManager.SlotType.CONTENT_INFORMATION
+        slotType: notificationManager.SlotType.CONTENT_INFORMATION,
+        wantAgent: ReminderService.wantAgentFor(ReminderKind.DAILY_RECORD)
       };
       await reminderAgentManager.publishReminder(reminder);
     } catch (err) {
@@ -37,30 +55,46 @@ export class ReminderService {
     }
   }
 
-  /** 发布某一天的重要日子提醒（当天 09:00） */
-  static async publishAnniversaryReminder(title: string, dateStr: string): Promise<void> {
+  /**
+   * 发布某个重要日子的提醒：提前 advanceDays 天、当天 09:00。
+   *
+   * - 提醒日 = 纪念日 - advanceDays（跨月跨年交给 DateUtils.addDays）
+   * - 已经过去的时刻直接跳过，不补弹（否则每次改设置都会立刻响一条旧提醒）
+   * - 正文按提前天数变化：今天 / 明天 / 还有 N 天
+   * - 点击通知落到重要日子页（wantAgent）
+   */
+  static async publishAnniversaryReminder(title: string, dateStr: string, advanceDays: number): Promise<void> {
     try {
       if (!DateUtils.isValidDateStr(dateStr)) {
         return;
       }
-      const y: number = Number(dateStr.slice(0, 4));
-      const m: number = Number(dateStr.slice(5, 7));
-      const d: number = Number(dateStr.slice(8, 10));
+      const days: number = normalizeAdvanceDays(advanceDays);
+      const reminderDate: string = reminderDateFor(dateStr, days);
+      if (!shouldScheduleAt(reminderDate, Constants.ANNIVERSARY_REMINDER_HOUR,
+        Constants.ANNIVERSARY_REMINDER_MINUTE, new Date())) {
+        hilog.info(Constants.LOG_DOMAIN, Constants.LOG_TAG,
+          '重要日子提醒时刻已过，跳过: %{public}s', reminderDate);
+        return;
+      }
+      const y: number = Number(reminderDate.slice(0, 4));
+      const m: number = Number(reminderDate.slice(5, 7));
+      const d: number = Number(reminderDate.slice(8, 10));
       const dateTime: reminderAgentManager.LocalDateTime = {
         year: y,
         month: m,
         day: d,
-        hour: 9,
-        minute: 0,
+        hour: Constants.ANNIVERSARY_REMINDER_HOUR,
+        minute: Constants.ANNIVERSARY_REMINDER_MINUTE,
         second: 0
       };
       const reminder: reminderAgentManager.ReminderRequestCalendar = {
         reminderType: reminderAgentManager.ReminderType.REMINDER_TYPE_CALENDAR,
         dateTime: dateTime,
         title: '重要日子提醒',
-        content: `今天是「${title}」`,
+        content: anniversaryReminderText(title, days),
         notificationId: 2001,
-        slotType: notificationManager.SlotType.CONTENT_INFORMATION
+        slotType: notificationManager.SlotType.CONTENT_INFORMATION,
+        wantAgent: ReminderService.wantAgentFor(ReminderKind.ANNIVERSARY)
       };
       await reminderAgentManager.publishReminder(reminder);
     } catch (err) {
@@ -114,7 +148,8 @@ export class ReminderService {
             title: PLAN_REMINDER_TITLE,
             content: content,
             notificationId: Constants.PLAN_REMINDER_ID_BASE + i,
-            slotType: notificationManager.SlotType.CONTENT_INFORMATION
+            slotType: notificationManager.SlotType.CONTENT_INFORMATION,
+            wantAgent: ReminderService.wantAgentFor(ReminderKind.TODAY_PLAN)
           };
           const reminderId: number = await reminderAgentManager.publishReminder(reminder);
           ids.push(reminderId);
@@ -189,7 +224,8 @@ export class ReminderService {
             title: HABIT_REMINDER_TITLE,
             content: `${slot.name} · 第 ${slot.slotIndex + 1}/${slot.total} 次`,
             notificationId: HABIT_REMINDER_NOTIFICATION_BASE + i,
-            slotType: notificationManager.SlotType.CONTENT_INFORMATION
+            slotType: notificationManager.SlotType.CONTENT_INFORMATION,
+            wantAgent: ReminderService.wantAgentFor(ReminderKind.HABIT)
           };
           const reminderId: number = await reminderAgentManager.publishReminder(reminder);
           ids.push(reminderId);

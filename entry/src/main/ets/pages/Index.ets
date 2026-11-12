@@ -18,6 +18,13 @@ struct Index {
   @State private showPrivacy: boolean = false;
   /** 初始化失败：显示可重试的错误页，而不是把用户丢在一个不存在的页面上 */
   @State private initFailed: boolean = false;
+  /**
+   * 本次冷启动是否已经标记过"需要解锁"。
+   *
+   * 只在首次 bootstrap 成功后标记一次：错误页的「重试」会再次走 bootstrap，
+   * 如果每次都标记，用户刚解锁完又会被要求再解一次。
+   */
+  private coldStartMarked: boolean = false;
 
   aboutToAppear(): void {
     this.bootstrap();
@@ -35,6 +42,15 @@ struct Index {
       await SessionManager.getInstance().init(context);
       // 读出应用锁配置；冷启动是否需要验证由 AppLockManager 判定，首页呈现锁屏
       await AppLockManager.getInstance().load();
+      // ⚠️ 必须在 load() **之后**标记冷启动。
+      // markColdStart() 内部要判断 isOn()（依赖 load 读出来的 enabled/hash），
+      // 而 EntryAbility.onCreate 里的那次调用跑在 load 之前，enabled 还是 false，
+      // 会被判成"未开启"从而不置 pending —— 结果就是杀掉进程重开后锁屏不出现。
+      // 这里补一次，保证冷启动一定会要求验证。
+      if (!this.coldStartMarked) {
+        this.coldStartMarked = true;
+        AppLockManager.getInstance().markColdStart();
+      }
 
       const agreed: boolean = await SessionManager.getInstance().isPrivacyAgreed();
       if (!agreed) {

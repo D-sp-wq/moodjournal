@@ -7,6 +7,7 @@ import {
   isValidPin
 } from '../models/AppLock';
 import { AppLockManager } from '../services/storage/AppLockManager';
+import { SessionManager } from '../services/storage/SessionManager';
 import { Icon, IconKind } from '../components/Icons';
 
 /** 当前正在进行的输入阶段 */
@@ -33,6 +34,9 @@ struct LockSettingsPage {
   @State private loaded: boolean = false;
   /** true 表示当前这次验证通过后要关闭锁，而不是改密码 */
   @State private pendingDisable: boolean = false;
+  /** 指纹 / 人脸解锁：开关状态与设备是否支持 */
+  @State private biometricOn: boolean = false;
+  @State private biometricSupported: boolean = false;
 
   private manager: AppLockManager = AppLockManager.getInstance();
 
@@ -40,6 +44,29 @@ struct LockSettingsPage {
     this.on = this.manager.isOn();
     this.grace = this.manager.getGraceMinutes();
     this.loaded = true;
+    this.initBiometric();
+  }
+
+  /** 读开关状态，并查询设备有没有已录入的指纹/人脸 */
+  private async initBiometric(): Promise<void> {
+    try {
+      this.biometricOn = await SessionManager.getInstance().isBiometricEnabled();
+    } catch (err) {
+      this.biometricOn = false;
+    }
+    this.biometricSupported = await this.manager.isBiometricAvailable();
+  }
+
+  /** 切换开关：先落盘，失败时回退显示 */
+  private async toggleBiometric(isOn: boolean): Promise<void> {
+    const previous: boolean = this.biometricOn;
+    this.biometricOn = isOn;
+    try {
+      await SessionManager.getInstance().setBiometricEnabled(isOn);
+    } catch (err) {
+      this.biometricOn = previous;
+      this.getUIContext().getPromptAction().showToast({ message: '设置失败，请重试', duration: 1800 });
+    }
   }
 
   private beginSetPin(): void {
@@ -395,6 +422,60 @@ struct LockSettingsPage {
     .alignItems(HorizontalAlign.Start)
   }
 
+  /** 指纹 / 人脸解锁卡片：仅在应用锁开启时显示；设备不支持时置灰并说明原因 */
+  @Builder
+  private buildBiometricCard() {
+    Column() {
+      Row() {
+        Icon({
+          kind: IconKind.LOCK,
+          iconSize: 24,
+          color: this.biometricSupported ? Constants.COLOR_PRIMARY : Constants.COLOR_TEXT_TERTIARY
+        })
+        Column() {
+          Text('指纹 / 人脸解锁')
+            .fontSize(17)
+            .fontWeight(FontWeight.Medium)
+            .fontColor(this.biometricSupported ? Constants.COLOR_TEXT_PRIMARY : Constants.COLOR_TEXT_TERTIARY)
+          Text(this.biometricSupported
+            ? '用本机已录入的指纹或人脸快速解锁'
+            : '本机还没有录入指纹或人脸，所以暂时用不了。可到系统设置里录入后再来开启')
+            .fontSize(14)
+            .lineHeight(21)
+            .fontColor(Constants.COLOR_TEXT_SECONDARY)
+            .margin({ top: 4 })
+        }
+        .alignItems(HorizontalAlign.Start)
+        .layoutWeight(1)
+        .margin({ left: 10 })
+
+        Toggle({ type: ToggleType.Switch, isOn: this.biometricOn })
+          .width(40)
+          .enabled(this.biometricSupported)
+          .opacity(this.biometricSupported ? 1 : 0.4)
+          .onChange((isOn: boolean) => {
+            this.toggleBiometric(isOn);
+          })
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+
+      Text('密码始终可用：指纹或人脸没通过时，仍然可以输入密码解锁。')
+        .fontSize(13)
+        .lineHeight(20)
+        .fontColor(Constants.COLOR_TEXT_TERTIARY)
+        .width('100%')
+        .margin({ top: 12 })
+    }
+    .width('100%')
+    .padding(18)
+    .borderRadius(16)
+    .backgroundColor(Constants.COLOR_CARD)
+    .shadow({ radius: 12, color: Constants.COLOR_SHADOW, offsetY: 4 })
+    .margin({ top: 14 })
+    .alignItems(HorizontalAlign.Start)
+  }
+
   @Builder
   private buildGraceCard() {
     Column() {
@@ -474,6 +555,9 @@ struct LockSettingsPage {
           if (this.loaded) {
             if (this.step === STEP_NONE) {
               this.buildStatusCard()
+              if (this.on) {
+                this.buildBiometricCard()
+              }
               this.buildGraceCard()
               this.buildNotice()
             } else {

@@ -26,6 +26,7 @@ import tagTest from './Tag.test';
 import annualReportTest from './AnnualReport.test';
 import exportBackupTest from './Export.test';
 import planReminderTest from './PlanReminder.test';
+import reminderRouteTest from './ReminderRoute.test';
 
 export default function testsuite() {
   localUnitTest();
@@ -56,4 +57,5 @@ export default function testsuite() {
   annualReportTest();
   exportBackupTest();
   planReminderTest();
+  reminderRouteTest();
 }

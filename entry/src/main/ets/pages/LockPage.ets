@@ -6,6 +6,7 @@ import {
   attemptHintText
 } from '../models/AppLock';
 import { AppLockManager } from '../services/storage/AppLockManager';
+import { SessionManager } from '../services/storage/SessionManager';
 import { Icon, IconKind } from '../components/Icons';
 
 /**
@@ -24,8 +25,33 @@ struct LockPage {
   @State private failCount: number = 0;
   @State private shake: number = 0;
   @State private hint: string = '';
+  /** 是否显示生物识别入口：用户开了开关 且 设备上有已录入的指纹/人脸 */
+  @State private biometricReady: boolean = false;
 
   private manager: AppLockManager = AppLockManager.getInstance();
+  /** 防止连点重复拉起系统认证 */
+  private authenticating: boolean = false;
+
+  aboutToAppear(): void {
+    this.loadBiometric();
+  }
+
+  /**
+   * 生物识别入口的前提条件：用户打开过开关 + 设备确实录入了指纹/人脸。
+   * 任何一步读失败都不显示入口（PIN 永远可用，不影响解锁）。
+   */
+  private async loadBiometric(): Promise<void> {
+    try {
+      const enabled: boolean = await SessionManager.getInstance().isBiometricEnabled();
+      if (!enabled) {
+        this.biometricReady = false;
+        return;
+      }
+      this.biometricReady = await this.manager.isBiometricAvailable();
+    } catch (err) {
+      this.biometricReady = false;
+    }
+  }
 
   /** 返回键拦截：锁屏页不允许后退 */
   onBackPress(): boolean {
@@ -58,10 +84,7 @@ struct LockPage {
   private submit(): void {
     const pin: string = this.input;
     if (this.manager.verify(pin)) {
-      this.manager.clearPending();
-      this.failCount = 0;
-      this.input = '';
-      this.getUIContext().getRouter().back();
+      this.unlockSucceeded();
       return;
     }
     this.failCount += 1;
@@ -70,6 +93,46 @@ struct LockPage {
     // 抖动一次（换值触发动画）
     this.shake = this.shake === 0 ? 1 : 0;
     this.getUIContext().getPromptAction().showToast({ message: '密码错误', duration: 1200 });
+  }
+
+  /**
+   * 解锁成功后的唯一出口：PIN 与生物识别必须走完全相同的路径，
+   * 否则很容易出现"生物识别解开了但 pending 没清、页面还在锁屏"的半吊子状态。
+   */
+  private unlockSucceeded(): void {
+    this.manager.clearPending();
+    this.failCount = 0;
+    this.input = '';
+    this.hint = '';
+    this.getUIContext().getRouter().back();
+  }
+
+  /**
+   * 指纹 / 人脸解锁。
+   *
+   * 失败或取消只是弹一句提示：不锁死页面、不清空已经输入的密码，
+   * 用户可以直接接着按数字继续用 PIN 解锁。
+   */
+  private async tryBiometric(): Promise<void> {
+    if (this.authenticating) {
+      return;
+    }
+    this.authenticating = true;
+    let ok: boolean = false;
+    try {
+      ok = await this.manager.authWithBiometric();
+    } catch (err) {
+      ok = false;
+    }
+    this.authenticating = false;
+    if (ok) {
+      this.unlockSucceeded();
+      return;
+    }
+    this.getUIContext().getPromptAction().showToast({
+      message: '指纹或人脸未通过，可继续输入密码',
+      duration: 2000
+    });
   }
 
   private showForgot(): void {
@@ -162,6 +225,36 @@ struct LockPage {
     })
   }
 
+  /**
+   * 生物识别入口：放在数字键盘上方，不抢 PIN 的位置。
+   * 只在「用户开了开关 + 设备有可用指纹/人脸」时出现。
+   */
+  @Builder
+  private buildBiometricEntry() {
+    Row() {
+      Icon({ kind: IconKind.LOCK, iconSize: 20, color: Constants.COLOR_PRIMARY })
+      Text('指纹 / 人脸解锁')
+        .fontSize(16)
+        .fontColor(Constants.COLOR_PRIMARY)
+        .margin({ left: 8 })
+    }
+    .height(44)
+    .padding({ left: 20, right: 20 })
+    .borderRadius(22)
+    .backgroundColor(Constants.COLOR_CARD)
+    .border({ width: 1, color: Constants.COLOR_BORDER_SUBTLE })
+    .justifyContent(FlexAlign.Center)
+    .margin({ bottom: 12 })
+    .stateStyles({
+      pressed: {
+        .opacity(0.6)
+      }
+    })
+    .onClick(() => {
+      this.tryBiometric();
+    })
+  }
+
   @Builder
   private buildKeypad() {
     Column() {
@@ -231,6 +324,10 @@ struct LockPage {
       .layoutWeight(1)
       .justifyContent(FlexAlign.Center)
       .padding({ left: 32, right: 32 })
+
+      if (this.biometricReady) {
+        this.buildBiometricEntry()
+      }
 
       this.buildKeypad()
 
